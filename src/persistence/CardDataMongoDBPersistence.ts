@@ -15,7 +15,7 @@ export class CardDataMongoDBPersistence
     implements ICardDataPersistence {
 
     constructor() {
-        super('CardData', CardDataMongoDBSchema());
+        super('carddata', CardDataMongoDBSchema());
         this._maxPageSize = 1000;
     }
 
@@ -28,13 +28,21 @@ export class CardDataMongoDBPersistence
         if (id != null) 
             criteria.push({ _id: id });
 
-        let siteId = filter.getAsNullableString('site_id');
-        if (siteId != null)
-            criteria.push({ site_id: siteId });
+        let power = filter.getAsNullableString('power');
+        if (power != null)
+            criteria.push({ power: power });
 
-        let label = filter.getAsNullableString('label');
-        if (label != null)
-            criteria.push({ label: label });
+        let toughness = filter.getAsNullableString('toughness');
+        if (toughness != null)
+            criteria.push({ toughness: toughness });
+
+        let loyalty = filter.getAsNullableString('loyalty');
+        if (loyalty != null)
+            criteria.push({ loyalty: loyalty });
+
+        let mana_cost = filter.getAsNullableString('mana_cost');
+        if (mana_cost != null)
+            criteria.push({mana_cost: mana_cost });
 
         let name = filter.getAsNullableString('name');
         if (name != null) {
@@ -42,8 +50,8 @@ export class CardDataMongoDBPersistence
         }
 
         let printed_name = filter.getAsNullableString('printed_name');
-        if (name != null) {
-            criteria.push({ name: name });
+        if (printed_name != null) {
+            criteria.push({ printed_name: printed_name });
         }
 
         return criteria.length > 0 ? { $and: criteria } : null;

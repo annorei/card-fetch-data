@@ -2,16 +2,22 @@ let _ = require('lodash');
 let async = require('async');
 let assert = require('chai').assert;
 
+import { ConfigParams } from 'pip-services3-commons-node';
+import { Descriptor } from 'pip-services3-commons-node';
+import { References } from 'pip-services3-commons-node';
 import { FilterParams } from 'pip-services3-commons-node';
 import { PagingParams } from 'pip-services3-commons-node';
 
 import { CardDataV1 } from '../../src/data/version1/CardDataV1';
+import { ICardDataPersistence } from '../../src/persistence/ICardDataPersistence';
+import { ICardDataController } from '../../src/logic/ICardDataController';
 import { ImageURIsV1 } from '../../src/data/version1/ImageURIsV1';
 import { LanguagesV1 } from '../../src/data/version1/LanguagesV1';
 import { LegalitiesV1 } from '../../src/data/version1/LegalitiesV1';
 import { LegalTypesV1 } from '../../src/data/version1/LegalTypesV1';
 import { PricesV1 } from '../../src/data/version1/PricesV1';
-import { ICardDataPersistence } from '../../src/persistence/ICardDataPersistence';
+import { CardDataMemoryPersistence } from '../../src/persistence/CardDataMemoryPersistence';
+import { CardDataController } from '../../src/logic/CardDataController';
 
 const CARD1: CardDataV1 = {
     last_updated: 1582889072813,
@@ -36,29 +42,39 @@ const CARD2: CardDataV1 = {
     prices: new PricesV1(10, 20, 5)
 };
 
-const CARD3: CardDataV1 = {
-    last_updated: 1582889072855,
-    id: '3',
-    name: 'PTE',
-    cmc: 1,
-    mana_cost: '{W}',
-    type_line: 'Instant',
-    lang: LanguagesV1.Russian
-};
 
-export class CardDataPersistenceFixture {
-    private _persistence: ICardDataPersistence;
+suite('CardDataController', () => {
+    let persistence: CardDataMemoryPersistence;
+    let controller: CardDataController;
 
-    public constructor(persistence: ICardDataPersistence) {
-        assert.isNotNull(persistence);
-        this._persistence = persistence;
-    }
+    setup((done) => {
+        persistence = new CardDataMemoryPersistence();
+        persistence.configure(new ConfigParams());
 
-    private testCreateCards(done) {
+        controller = new CardDataController();
+        controller.configure(new ConfigParams());
+
+        let references = References.fromTuples(
+            new Descriptor('carddata', 'persistence', 'memory', 'default', '1.0'), persistence,
+            new Descriptor('carddata', 'controller', 'default', 'default', '1.0'), controller
+        );
+
+        controller.setReferences(references);
+
+        persistence.open(null, done);
+    });
+
+    teardown((done) => {
+        persistence.close(null, done);
+    });
+
+    test('CRUD Operations', (done) => {
+        let card1: CardDataV1;
+
         async.series([
             // Create the first card
             (callback) => {
-                this._persistence.create(
+                controller.createCard(
                     null,
                     CARD1,
                     (err, card) => {
@@ -73,7 +89,7 @@ export class CardDataPersistenceFixture {
                         assert.equal(CARD1.type_line, card.type_line);
                         assert.equal(CARD1.loyalty, card.loyalty);
                         assert.equal(CARD1.oracle_text, card.oracle_text);
-                        assert.equal(CARD1.prices, card.prices);
+                        assert.equal(CARD1.lang, card.lang);
                         assert.isNotNull(card.id);
 
                         callback();
@@ -82,7 +98,7 @@ export class CardDataPersistenceFixture {
             },
             // Create the second card
             (callback) => {
-                this._persistence.create(
+                controller.createCard(
                     null,
                     CARD2,
                     (err, card) => {
@@ -97,48 +113,17 @@ export class CardDataPersistenceFixture {
                         assert.equal(CARD2.power, card.power);
                         assert.equal(CARD2.toughness, card.toughness);
                         assert.equal(CARD2.oracle_text, card.oracle_text);
+                        assert.equal(CARD2.prices, card.prices);
+                        assert.equal(CARD2.lang, card.lang);
                         assert.isNotNull(card.id);
 
                         callback();
                     }
                 );
-            },
-            // Create the third card
-            (callback) => {
-                this._persistence.create(
-                    null,
-                    CARD3,
-                    (err, card) => {
-                        assert.isNull(err);
-
-                        assert.isObject(card);
-                        assert.equal(CARD3.last_updated, card.last_updated);
-                        assert.equal(CARD3.id, card.id);
-                        assert.equal(CARD3.name, card.name);
-                        assert.equal(CARD3.cmc, card.cmc);
-                        assert.equal(CARD3.type_line, card.type_line);
-                        assert.equal(CARD3.loyalty, card.loyalty);
-                        assert.equal(CARD3.oracle_text, card.oracle_text);
-                        assert.isNotNull(card.id);
-
-                        callback();
-                    }
-                );
-            }
-        ], done);
-    }
-
-    public testCrudOperations(done) {
-        let card1: CardDataV1;
-
-        async.series([
-            // Create items
-            (callback) => {
-                this.testCreateCards(callback);
             },
             // Get all cards
             (callback) => {
-                this._persistence.getPageByFilter(
+                controller.getCards(
                     null,
                     new FilterParams(),
                     new PagingParams(),
@@ -146,7 +131,7 @@ export class CardDataPersistenceFixture {
                         assert.isNull(err);
 
                         assert.isObject(page);
-                        assert.lengthOf(page.data, 3);
+                        assert.lengthOf(page.data, 2);
 
                         card1 = page.data[0];
 
@@ -158,14 +143,14 @@ export class CardDataPersistenceFixture {
             (callback) => {
                 card1.name = 'ABC';
 
-                this._persistence.update(
+                controller.updateCard(
                     null,
                     card1,
                     (err, card) => {
                         assert.isNull(err);
 
                         assert.isObject(card);
-                        assert.equal(card1.id, card.id);
+                        assert.equal(card.id, card.id);
                         assert.equal('ABC', card.name);
 
                         callback();
@@ -174,14 +159,14 @@ export class CardDataPersistenceFixture {
             },
             // Get card by name
             (callback) => {
-                this._persistence.getOneByName(
+                controller.getCardByName(
                     null, 
                     card1.name,
                     (err, card) => {
                         assert.isNull(err);
 
                         assert.isObject(card);
-                        assert.equal(card1.id, card.id);
+                        assert.equal(card1.name, card.name);
 
                         callback();
                     }
@@ -189,7 +174,7 @@ export class CardDataPersistenceFixture {
             },
             // Delete the card
             (callback) => {
-                this._persistence.deleteById(
+                controller.deleteCardById(
                     null,
                     card1.id,
                     (err, card) => {
@@ -204,7 +189,7 @@ export class CardDataPersistenceFixture {
             },
             // Try to get deleted card
             (callback) => {
-                this._persistence.getOneById(
+                controller.getCardById(
                     null,
                     card1.id,
                     (err, card) => {
@@ -217,117 +202,83 @@ export class CardDataPersistenceFixture {
                 )
             }
         ], done);
-    }
+    });
 
-    public testGetWithFilters(done) {
+/*
+    test('Calculate Positions', (done) => {
         async.series([
-            // Create items
+            // Create the first beacon
             (callback) => {
-                this.testCreateCards(callback);
-            },
-            // Filter by id
-            (callback) => {
-                this._persistence.getPageByFilter(
+                controller.createBeacon(
                     null,
-                    FilterParams.fromTuples(
-                        'id', '1'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
+                    BEACON1,
+                    (err, beacon) => {
                         assert.isNull(err);
 
-                        assert.lengthOf(page.data, 1);
+                        assert.isObject(beacon);
+                        assert.equal(BEACON1.udi, beacon.udi);
+                        assert.equal(BEACON1.site_id, beacon.site_id);
+                        assert.equal(BEACON1.type, beacon.type);
+                        assert.equal(BEACON1.label, beacon.label);
+                        assert.isNotNull(beacon.center);
+
+                        callback();
+                    }
+                );
+            },
+            // Create the second beacon
+            (callback) => {
+                controller.createBeacon(
+                    null,
+                    BEACON2,
+                    (err, beacon) => {
+                        assert.isNull(err);
+
+                        assert.isObject(beacon);
+                        assert.equal(BEACON2.udi, beacon.udi);
+                        assert.equal(BEACON2.site_id, beacon.site_id);
+                        assert.equal(BEACON2.type, beacon.type);
+                        assert.equal(BEACON2.label, beacon.label);
+                        assert.isNotNull(beacon.center);
+
+                        callback();
+                    }
+                );
+            },
+            // Calculate position for one beacon
+            (callback) => {
+                controller.calculatePosition(
+                    null, '1', ['00001'],
+                    (err, position) => {
+                        assert.isNull(err);
+
+                        assert.isObject(position);
+                        assert.equal('Point', position.type);
+                        assert.lengthOf(position.coordinates, 2);
+                        assert.equal(0, position.coordinates[0]);
+                        assert.equal(0, position.coordinates[1]);
 
                         callback();
                     }
                 )
             },
-            // Filter by name
+            // Calculate position for two beacons
             (callback) => {
-                this._persistence.getPageByFilter(
-                    null,
-                    FilterParams.fromTuples(
-                        'name', 'JTMS'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
+                controller.calculatePosition(
+                    null, '1', ['00001', '00002'],
+                    (err, position) => {
                         assert.isNull(err);
 
-                        assert.lengthOf(page.data, 1);
+                        assert.isObject(position);
+                        assert.equal('Point', position.type);
+                        assert.lengthOf(position.coordinates, 2);
+                        assert.equal(1, position.coordinates[0]);
+                        assert.equal(1, position.coordinates[1]);
 
                         callback();
                     }
                 )
-            },
-            // Filter by mana_cost
-            (callback) => {
-                this._persistence.getPageByFilter(
-                    null,
-                    FilterParams.fromTuples(
-                        'mana_cost', '{W}'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
-                        assert.isNull(err);
-
-                        assert.lengthOf(page.data, 1);
-
-                        callback();
-                    }
-                )
-            },
-            // Filter by power
-            (callback) => {
-                this._persistence.getPageByFilter(
-                    null,
-                    FilterParams.fromTuples(
-                        'power', '2'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
-                        assert.isNull(err);
-
-                        assert.lengthOf(page.data, 1);
-
-                        callback();
-                    }
-                )
-            },
-            // Filter by toughness
-            (callback) => {
-                this._persistence.getPageByFilter(
-                    null,
-                    FilterParams.fromTuples(
-                        'toughness', '1'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
-                        assert.isNull(err);
-
-                        assert.lengthOf(page.data, 1);
-
-                        callback();
-                    }
-                )
-            },
-            // Filter by loyalty
-            (callback) => {
-                this._persistence.getPageByFilter(
-                    null,
-                    FilterParams.fromTuples(
-                        'loyalty', '4'
-                    ),
-                    new PagingParams(),
-                    (err, page) => {
-                        assert.isNull(err);
-
-                        assert.lengthOf(page.data, 1);
-
-                        callback();
-                    }
-                )
-            },
-            
+            }
         ], done);
-    }
-}
+    });*/
+});

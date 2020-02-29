@@ -2,7 +2,7 @@ import { Schema } from 'mongoose';
 let Mixed = Schema.Types.Mixed;
 
 export let CardDataMongoDBSchema = function(collection?: string) {
-    collection = collection || 'CardData';
+    collection = collection || 'carddata';
 
     let schema = new Schema(
         {
@@ -32,7 +32,7 @@ export let CardDataMongoDBSchema = function(collection?: string) {
             set_name: {type: String, required: false},
             rulings_uri: {type: String, required: false},
             rarity: {type: String, required: false},
-            prices: {type: String, required: false},
+            prices: {type: Mixed, required: false},
             custom_tags: {type: Array, required: false}
         },
         {

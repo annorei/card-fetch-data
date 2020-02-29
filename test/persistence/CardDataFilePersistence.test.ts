@@ -8,7 +8,7 @@ suite('CardDataFilePersistence', () => {
     let fixture: CardDataPersistenceFixture;
 
     setup((done) => {
-        persistence = new CardDataFilePersistence('card.test.json');
+        persistence = new CardDataFilePersistence('data/card.test.json');
         persistence.configure(new ConfigParams());
 
         fixture = new CardDataPersistenceFixture(persistence);
