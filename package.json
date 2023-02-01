@@ -7,7 +7,7 @@
     "test": "mocha -t 5000 -R spec -u tdd --recursive ./obj/test"
   },
   "dependencies": {
-    "mongoose": "^5.9.2",
+    "mongoose": "^5.13.15",
     "pip-services3-commons-node": "^3.0.*",
     "pip-services3-components-node": "^3.0.*",
     "pip-services3-container-node": "3.0.*",
